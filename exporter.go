@@ -50,13 +50,13 @@ type Exporter struct {
 }
 
 // Creates a new Xray exporter with default settings.
-func NewExporter(endpoint string, scrapeTimeout time.Duration, withUserMetrics bool) (*Exporter, error) {
-	return NewExporterWithLogConfig(endpoint, scrapeTimeout, withUserMetrics, "", DefaultLogTimeWindowMinutes*time.Minute)
+func NewExporter(endpoint string, scrapeTimeout time.Duration, withUserMetrics bool, withGeoIP bool) (*Exporter, error) {
+	return NewExporterWithLogConfig(endpoint, scrapeTimeout, withUserMetrics, withGeoIP, "", DefaultLogTimeWindowMinutes*time.Minute)
 }
 
 // Creates a new Xray exporter with custom log parsing configuration.
 // Pass empty logPath to disable user metrics from log parsing.
-func NewExporterWithLogConfig(endpoint string, scrapeTimeout time.Duration, withUserMetrics bool, logPath string, logTimeWindow time.Duration) (*Exporter, error) {
+func NewExporterWithLogConfig(endpoint string, scrapeTimeout time.Duration, withUserMetrics bool, withGeoIP bool, logPath string, logTimeWindow time.Duration) (*Exporter, error) {
 	e := Exporter{
 		endpoint:        endpoint,
 		scrapeTimeout:   scrapeTimeout,
@@ -118,26 +118,27 @@ func NewExporterWithLogConfig(endpoint string, scrapeTimeout time.Duration, with
 
 	e.conn = conn
 
-	// Initialize GeoIP readers
-	asnDB, err := geoip2.Open(geoip.ASNPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open GeoIP ASN database: %w", err)
-	}
-	e.geoipASNReader = asnDB
+	// Initialize GeoIP readers if enabled
+	if withGeoIP {
+		asnDB, err := geoip2.Open(geoip.ASNPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open GeoIP ASN database: %w", err)
+		}
+		e.geoipASNReader = asnDB
 
-	cityDB, err := geoip2.Open(geoip.CityPath)
-	if err != nil {
-		// If city database is missing, we still continue but city/country metrics will be unknown
-		logrus.WithError(err).Warn("Failed to open GeoIP City database, city/country metrics will be unavailable")
-	} else {
-		e.geoipCityReader = cityDB
-	}
+		cityDB, err := geoip2.Open(geoip.CityPath)
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to open GeoIP City database, city/country metrics will be unavailable")
+		} else {
+			e.geoipCityReader = cityDB
+		}
 
-	countryDB, err := geoip2.Open(geoip.CountryPath)
-	if err != nil {
-		logrus.WithError(err).Warn("Failed to open GeoIP Country database, country metrics will be limited")
-	} else {
-		e.geoipCountryReader = countryDB
+		countryDB, err := geoip2.Open(geoip.CountryPath)
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to open GeoIP Country database, country metrics will be limited")
+		} else {
+			e.geoipCountryReader = countryDB
+		}
 	}
 
 	// Initialize log parser if path provided
