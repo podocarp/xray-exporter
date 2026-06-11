@@ -568,8 +568,10 @@ func (p *Parser) parseLogFile() error {
 
 		// Update Detailed ASN tracking (consolidated metric)
 		// Key format: asn|org
-		asnKey := fmt.Sprintf("%s|%s", asn, org)
-		p.metrics.ASNCounts[asnKey]++
+		if asn != "unknown" {
+			asnKey := fmt.Sprintf("%s|%s", asn, org)
+			p.metrics.ASNCounts[asnKey]++
+		}
 	}
 
 	// Update file position for next read
